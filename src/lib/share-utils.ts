@@ -70,19 +70,20 @@ export const generateShareImage = async (data: SharePreviewData): Promise<Blob |
 
         const canvas = await html2canvas(container, {
           backgroundColor: '#ffffff',
-          scale: 2,
+          scale: 3,
           useCORS: true,
           allowTaint: true,
           logging: false,
           width: 1080,
           height: 1920,
           windowHeight: 1920,
+          textStrokeWidth: 0,
         });
 
         document.body.removeChild(container);
 
         return await new Promise((resolve) => {
-          canvas.toBlob((blob) => resolve(blob), 'image/png', 0.95);
+          canvas.toBlob((blob) => resolve(blob), 'image/png', 1.0);
         });
       } catch (err) {
         console.warn('Échec du rendu depuis le DOM source, fallback au template interne.', err);
@@ -199,13 +200,14 @@ export const generateShareImage = async (data: SharePreviewData): Promise<Blob |
     // Générer l'image avec une résolution élevée
     const canvas = await html2canvas(container, {
       backgroundColor: '#ffffff',
-      scale: 2,
+      scale: 3,
       useCORS: true,
       allowTaint: true,
       logging: false,
       width: 1080,
       height: 1920,
       windowHeight: 1920,
+      textStrokeWidth: 0,
     });
 
     document.body.removeChild(container);
@@ -214,7 +216,7 @@ export const generateShareImage = async (data: SharePreviewData): Promise<Blob |
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
         resolve(blob);
-      }, 'image/png', 0.95);
+      }, 'image/png', 1.0);
     });
   } catch (error) {
     console.error('Erreur lors de la génération de l\'image:', error);
