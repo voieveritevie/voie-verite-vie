@@ -7,10 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChevronRight, ChevronLeft, Cross, Share2, Printer, BookOpen } from 'lucide-react';
 import { cheminDeCroixData } from '@/data/chemin-de-croix-data';
 import { generateShareImage, shareImage } from '@/lib/share-utils';
+import { useToast } from '@/components/ui/use-toast';
 
 const CheminDeCroix = memo(() => {
   const [selectedStation, setSelectedStation] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState('intro');
+  const [sharingProgress, setSharingProgress] = useState<{ current: number, total: number } | null>(null);
+  const { toast } = useToast();
 
   const printPage = () => window.print();
   const shareProgram = async () => {
@@ -79,14 +82,72 @@ const CheminDeCroix = memo(() => {
       alert('❌ Erreur lors du partage');
     }
   };
-
   const shareAllStations = async () => {
-    alert('👉 Sélectionnez une station pour la partager individuellement sur vos réseaux sociaux!\n\n✝️ Chaque station peut être partagée facilement avec un clic sur "Partager"');
+    const stations = cheminDeCroixData.stations;
+    
+    if (stations.length === 0) {
+      alert('Aucune station à partager');
+      return;
+    }
+    
+    setSharingProgress({ current: 0, total: stations.length });
+    
+    for (let idx = 0; idx < stations.length; idx++) {
+      const station = stations[idx];
+      
+      try {
+        setSharingProgress({ current: idx + 1, total: stations.length });
+        
+        const blob = await generateShareImage({
+          title: station.title,
+          reading: station.reading,
+          text: station.text,
+          meditation: station.meditation,
+          prayer: station.prayer,
+          adoration: cheminDeCroixData.adoration,
+          number: station.number,
+          type: 'station',
+        });
+        
+        if (blob) {
+          await shareImage(blob, `Station-${String(station.number).padStart(2, '0')}`);
+          console.log(`✅ Station ${station.number}/14 partagée`);
+        }
+      } catch (error) {
+        console.error(`❌ Erreur station ${station.number}:`, error);
+      }
+      
+      // Délai adapté : plus long sur desktop pour les téléchargements massifs
+      const isDesktop = !/android|iphone|ipad|ipot|webos/i.test(navigator.userAgent.toLowerCase());
+      const delay = isDesktop ? 500 : 300;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    setSharingProgress(null);
+    toast.success(`✝️ Les 14 stations ont été téléchargées/partagées!`);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:bg-slate-950 dark:text-slate-100">
       <Navigation />
+
+      {/* Barre de progression du partage */}
+      {sharingProgress && (
+        <div className="fixed top-0 left-0 right-0 bg-purple-600 text-white p-4 z-50 flex items-center gap-4">
+          <div className="flex-1">
+            <div className="flex justify-between text-sm mb-2">
+              <span>Partage en cours...</span>
+              <span>{sharingProgress.current}/{sharingProgress.total}</span>
+            </div>
+            <div className="w-full bg-purple-800 rounded-full h-2">
+              <div 
+                className="bg-white h-2 rounded-full transition-all duration-300" 
+                style={{ width: `${(sharingProgress.current / sharingProgress.total) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <header className="bg-gradient-to-br from-purple-900 via-purple-800 to-purple-900 text-white pt-20 pb-12 px-4 relative overflow-hidden dark:from-purple-950 dark:via-purple-900 dark:to-purple-950">

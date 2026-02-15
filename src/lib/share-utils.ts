@@ -99,6 +99,12 @@ export const generateShareImage = async (data: SharePreviewData): Promise<Blob |
     clonedContent.appendChild(footer);
     console.log('✨ Footer branding compact ajouté');
     
+    // Récupérer la largeur réelle du dialogue affiché à l'écran
+    const dialogElement = document.getElementById('share-source');
+    const actualWidth = dialogElement ? dialogElement.offsetWidth : window.innerWidth;
+    
+    console.log(`📐 Largeur réelle du dialogue: ${actualWidth}px`);
+    
     // Ajouter temporairement le clone au DOM
     const wrapper = document.createElement('div');
     wrapper.style.cssText = `
@@ -106,6 +112,7 @@ export const generateShareImage = async (data: SharePreviewData): Promise<Blob |
       left: -9999px;
       top: -9999px;
       background: white;
+      width: ${actualWidth}px;
     `;
     
     wrapper.appendChild(clonedContent);
@@ -115,8 +122,10 @@ export const generateShareImage = async (data: SharePreviewData): Promise<Blob |
     const originalMaxHeight = clonedContent.style.maxHeight;
     const originalOverflow = clonedContent.style.overflow;
     const originalHeight = clonedContent.style.height;
+    const originalWidth = clonedContent.style.width;
     
     // Retirer les contraintes pour capturer tout
+    clonedContent.style.width = '100%';
     clonedContent.style.maxHeight = 'none';
     clonedContent.style.overflow = 'visible';
     clonedContent.style.height = 'auto';
@@ -126,15 +135,29 @@ export const generateShareImage = async (data: SharePreviewData): Promise<Blob |
     // Attendre que le DOM se mette à jour et que les calculs CSS se terminent
     await new Promise(resolve => setTimeout(resolve, 150));
     
-    // Capturer avec meilleure qualité
+    // Adapter l'échelle pour la qualité du rendu selon la lageur
+    let scale = 2;
+    
+    if (actualWidth < 480) {
+      scale = 1.5;  // Petite largeur
+    } else if (actualWidth < 768) {
+      scale = 1.8;  // Largeur moyenne
+    } else {
+      scale = 2;    // Largeur grande
+    }
+    
+    console.log(`📱 Échelle adaptée: ${scale}x pour largeur ${actualWidth}px`);
+    
+    // Capturer avec les dimensions réelles du dialogue
     const canvas = await html2canvas(clonedContent, {
       backgroundColor: '#ffffff',
-      scale: 3,
+      scale: scale,
       useCORS: true,
       allowTaint: true,
       logging: false,
       imageTimeout: 0,
       windowHeight: clonedContent.scrollHeight,
+      width: actualWidth,
     });
     
     // Nettoyer le wrapper temporaire
@@ -174,7 +197,7 @@ export const shareImage = async (blob: Blob, title: string): Promise<boolean> =>
       type: 'image/png',
     });
 
-    // Mobile avec Web Share
+    // Essayer Web Share sur mobile
     if (!isDesktop && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({
@@ -182,29 +205,30 @@ export const shareImage = async (blob: Blob, title: string): Promise<boolean> =>
           title: title,
           text: '✝️ Voie, Vérité, Vie',
         });
+        console.log('✅ Partage Web Share réussi');
         return true;
       } catch (err) {
-        console.error('Erreur partage mobile:', err);
-        return false;
+        console.error('⚠️ Web Share échoué, fallback téléchargement:', err);
+        // Continuer au téléchargement en fallback
       }
-    } else if (isDesktop) {
-      // Desktop: télécharger
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${title.replace(/\s+/g, '-')}.png`;
-      document.body.appendChild(link);
-      link.click();
-      
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 500);
-      
-      return true;
     }
     
-    return false;
+    // Télécharger (desktop ou fallback mobile)
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${title.replace(/\s+/g, '-')}.png`;
+    document.body.appendChild(link);
+    link.click();
+    
+    console.log(`📥 Téléchargement lancé: ${title}`);
+    
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 500);
+    
+    return true;
   } catch (error) {
     console.error('❌ Erreur partage:', error);
     return false;

@@ -22,6 +22,7 @@ const Careme2026 = memo(() => {
   const [completedDates, setCompletedDates] = useState<string[]>([]);
   const [contentData, setContentData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [sharingProgress, setSharingProgress] = useState<{ current: number, total: number } | null>(null);
 
   // Flatten all days
   const allDays = contentData?.days || caremeData.fullProgram.flatMap((week: any) =>
@@ -60,17 +61,9 @@ const Careme2026 = memo(() => {
   };
 
   const canMarkCompleted = (dateObj: Date | null) => {
-    if (!dateObj) return false;
-    // Créer aujourd'hui à 00:00:00 pour comparer les dates sans l'heure
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Créer une copy de dateObj à 00:00:00
-    const dayToMark = new Date(dateObj);
-    dayToMark.setHours(0, 0, 0, 0);
-    
-    // On peut marquer complété seulement si la date est aujourd'hui ou dans le passé
-    return dayToMark <= today;
+    // Permet de marquer complété n'importe quel jour (passé, présent ou futur)
+    // Cette nouvelle logique permet aux utilisateurs de valider des actions en avance
+    return dateObj !== null && dateObj !== undefined;
   };
 
   const loadContent = useCallback(async () => {
@@ -212,7 +205,52 @@ const Careme2026 = memo(() => {
   };
 
   const shareAllDays = async () => {
-    alert('👉 Sélectionnez un jour pour le partager individuellement sur vos réseaux sociaux!\n\n🙏 Chaque jour peut être partagé facilement avec un clic sur "Partager ce jour"');
+    const nonSundayDays = allDays.filter((d: any) => !isSunday(d));
+    
+    if (nonSundayDays.length === 0) {
+      alert('Aucun jour à partager');
+      return;
+    }
+    
+    setSharingProgress({ current: 0, total: nonSundayDays.length });
+    
+    for (let idx = 0; idx < nonSundayDays.length; idx++) {
+      const day = nonSundayDays[idx];
+      const dayNum = idx + 1;
+      
+      try {
+        setSharingProgress({ current: idx + 1, total: nonSundayDays.length });
+        
+        const actionsList = [
+          day.actions?.soi ? `🪞 Soi: ${day.actions.soi}` : null,
+          day.actions?.prochain ? `❤️ Prochain: ${day.actions.prochain}` : null,
+          day.actions?.dieu ? `🙏 Dieu: ${day.actions.dieu}` : null,
+        ].filter(Boolean).join('\n\n');
+        
+        const blob = await generateShareImage({
+          title: 'Actions pour aujourd\'hui',
+          subtitle: `Jour ${dayNum}/40 - ${day.date}`,
+          text: actionsList,
+          number: dayNum,
+          type: 'day',
+        });
+        
+        if (blob) {
+          await shareImage(blob, `Careme-Actions-Jour-${String(dayNum).padStart(2, '0')}`);
+          console.log(`✅ Jour ${dayNum}/40 partagé`);
+        }
+      } catch (error) {
+        console.error(`❌ Erreur jour ${dayNum}:`, error);
+      }
+      
+      // Délai adapté : plus long sur desktop pour les téléchargements massifs
+      const isDesktop = !/android|iphone|ipad|ipot|webos/i.test(navigator.userAgent.toLowerCase());
+      const delay = isDesktop ? 500 : 300;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    setSharingProgress(null);
+    toast.success(`✝️ Les 40 jours ont été téléchargés/partagés!`);
   };
 
   useEffect(() => {
@@ -246,6 +284,24 @@ const Careme2026 = memo(() => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:bg-slate-950 dark:text-slate-100">
       <Navigation />
+
+      {/* Barre de progression du partage */}
+      {sharingProgress && (
+        <div className="fixed top-0 left-0 right-0 bg-violet-600 text-white p-4 z-50 flex items-center gap-4">
+          <div className="flex-1">
+            <div className="flex justify-between text-sm mb-2">
+              <span>Partage en cours...</span>
+              <span>{sharingProgress.current}/{sharingProgress.total}</span>
+            </div>
+            <div className="w-full bg-violet-800 rounded-full h-2">
+              <div 
+                className="bg-white h-2 rounded-full transition-all duration-300" 
+                style={{ width: `${(sharingProgress.current / sharingProgress.total) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <header className="bg-gradient-to-br from-violet-700 via-violet-600 to-violet-800 text-white pt-20 pb-12 px-4 relative overflow-hidden dark:from-violet-900 dark:via-violet-800 dark:to-violet-900">
@@ -418,19 +474,15 @@ const Careme2026 = memo(() => {
                         const dateObj = parseDateFromLabel(day.date);
                         const isCompleted = isCompletedDate(dateObj);
                         const isSun = isSunday(day);
-                        const canMark = canMarkCompleted(dateObj);
-                        const isFuture = dateObj && !canMark && !isCompleted;
                         
                         return (
                           <button
                             key={dayIdx}
-                            onClick={() => !isSun && !isFuture && setSelectedDay({ ...day, dateObj })}
-                            disabled={isFuture}
+                            onClick={() => !isSun && setSelectedDay({ ...day, dateObj })}
+                            disabled={isSun}
                             className={`p-3 rounded-lg text-left transition-all active:scale-95 ${
                               isSun
                                 ? 'bg-gray-50 border border-gray-200 cursor-default dark:bg-slate-800 dark:border-slate-600 dark:text-slate-400'
-                                : isFuture
-                                ? 'bg-gray-100 border border-gray-300 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-500'
                                 : 'bg-white border-2 border-violet-100 hover:border-violet-400 hover:shadow-md cursor-pointer dark:bg-slate-900 dark:border-violet-800 dark:text-slate-100'
                             } ${isCompleted ? 'ring-2 ring-green-400 ring-offset-1' : ''}`}
                           >
