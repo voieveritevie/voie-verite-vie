@@ -192,8 +192,8 @@ const Gallery = () => {
         {/* Modal with image gallery */}
         {selectedGroup && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeModal}>
-            <div className="max-w-5xl max-h-[90vh] w-full bg-card rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-              <div className="relative">
+            <div className="max-w-5xl max-h-[90vh] w-full bg-card rounded-2xl overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="relative flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -239,20 +239,22 @@ const Gallery = () => {
                 )}
               </div>
               
-              <div className="p-6">
-                <h3 className="text-2xl font-playfair font-bold text-primary mb-3">
-                  {selectedGroup.images[currentImageIndex].title}
-                </h3>
-                
-                {selectedGroup.images[currentImageIndex].description && (
-                  <p className="text-muted-foreground leading-relaxed">
-                    {selectedGroup.images[currentImageIndex].description}
-                  </p>
-                )}
+              <div className="overflow-y-auto flex-1 p-6 border-t border-border/20">
+                <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-md rounded-xl p-6 border border-border/30">
+                  <h3 className="text-2xl font-playfair font-bold text-primary mb-3">
+                    {selectedGroup.images[currentImageIndex].title}
+                  </h3>
+                  
+                  {selectedGroup.images[currentImageIndex].description && (
+                    <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap text-base">
+                      {selectedGroup.images[currentImageIndex].description}
+                    </p>
+                  )}
+                </div>
 
                 {/* Thumbnails */}
                 {selectedGroup.images.length > 1 && (
-                  <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                  <div className="flex gap-2 mt-6 overflow-x-auto pb-2">
                     {selectedGroup.images.map((img, idx) => (
                       <button
                         key={img.id}

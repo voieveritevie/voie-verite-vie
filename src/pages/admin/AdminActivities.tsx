@@ -29,6 +29,7 @@ interface Activity {
   price: string;
   image_url: string | null;
   is_published: boolean;
+  allow_registration: boolean;
   start_date?: string;
   end_date?: string;
   start_time?: string;
@@ -64,7 +65,8 @@ const AdminActivities = () => {
     end_time: '',
     location: '',
     price: 'Gratuit',
-    is_published: true
+    is_published: true,
+    allow_registration: true
   });
 
   useEffect(() => {
@@ -162,6 +164,7 @@ const AdminActivities = () => {
       location: formData.location,
       price: formData.price,
       is_published: formData.is_published,
+      allow_registration: formData.allow_registration,
       image_url: imageUrl,
       max_participants: 9999 // No limit
     };
@@ -204,7 +207,8 @@ const AdminActivities = () => {
       end_time: activity.end_time || activity.time.split(' - ')[1] || '',
       location: activity.location,
       price: activity.price,
-      is_published: activity.is_published
+      is_published: activity.is_published,
+      allow_registration: activity.allow_registration ?? true
     });
     setUploadedImages(activity.image_url ? [activity.image_url] : []);
     setIsDialogOpen(true);
@@ -239,7 +243,8 @@ const AdminActivities = () => {
       end_time: '',
       location: '',
       price: 'Gratuit',
-      is_published: true
+      is_published: true,
+      allow_registration: true
     });
   };
 
@@ -461,12 +466,21 @@ const AdminActivities = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={formData.is_published}
-                        onCheckedChange={(checked) => setFormData({...formData, is_published: checked})}
-                      />
-                      <Label>Publié</Label>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={formData.is_published}
+                          onCheckedChange={(checked) => setFormData({...formData, is_published: checked})}
+                        />
+                        <Label>Publié</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={formData.allow_registration}
+                          onCheckedChange={(checked) => setFormData({...formData, allow_registration: checked})}
+                        />
+                        <Label>Permettre les inscriptions</Label>
+                      </div>
                     </div>
                     <Button type="submit" className="w-full" disabled={uploading}>
                       {editingActivity ? 'Modifier' : 'Créer'}

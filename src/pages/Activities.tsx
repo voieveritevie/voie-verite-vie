@@ -25,6 +25,7 @@ interface Activity {
   price: string;
   image_url: string | null;
   is_published: boolean;
+  allow_registration: boolean;
   start_date?: string;
   end_date?: string;
   start_time?: string;
@@ -219,36 +220,41 @@ const Activities = () => {
             </div>
           </div>
           
-          {/* Nombre d'inscrits */}
-          <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
-            <User className="w-4 h-4 text-primary" />
-            <span>
-              {registrationCounts[activity.id] || 0} inscrit{(registrationCounts[activity.id] || 0) > 1 ? 's' : ''} 
-              {activity.max_participants > 0 && ` / ${activity.max_participants} places`}
-            </span>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-semibold text-primary">
-              {activity.price}
-            </span>
-            {!isPast ? (
-              <Button 
-                size="sm" 
-                className="divine-glow"
-                onClick={() => handleRegister(activity)}
-                disabled={activity.max_participants > 0 && (registrationCounts[activity.id] || 0) >= activity.max_participants}
-              >
-                {activity.max_participants > 0 && (registrationCounts[activity.id] || 0) >= activity.max_participants 
-                  ? 'Complet' 
-                  : "S'inscrire"}
-              </Button>
-            ) : (
-              <Badge variant="outline" className="text-muted-foreground">
-                Événement passé
-              </Badge>
-            )}
-          </div>
+          {/* Affichage conditionnel selon allow_registration */}
+          {activity.allow_registration && (
+            <>
+              {/* Nombre d'inscrits - Visible uniquement si inscriptions activées */}
+              <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                <User className="w-4 h-4 text-primary" />
+                <span>
+                  {registrationCounts[activity.id] || 0} inscrit{(registrationCounts[activity.id] || 0) > 1 ? 's' : ''} 
+                  {activity.max_participants > 0 && ` / ${activity.max_participants} places`}
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-semibold text-primary">
+                  {activity.price}
+                </span>
+                {!isPast ? (
+                  <Button 
+                    size="sm" 
+                    className="divine-glow"
+                    onClick={() => handleRegister(activity)}
+                    disabled={activity.max_participants > 0 && (registrationCounts[activity.id] || 0) >= activity.max_participants}
+                  >
+                    {activity.max_participants > 0 && (registrationCounts[activity.id] || 0) >= activity.max_participants 
+                      ? 'Complet' 
+                      : "S'inscrire"}
+                  </Button>
+                ) : (
+                  <Badge variant="outline" className="text-muted-foreground">
+                    Événement passé
+                  </Badge>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     );

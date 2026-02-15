@@ -59,6 +59,20 @@ const Careme2026 = memo(() => {
     return completedDates.includes(toIsoDate(dateObj));
   };
 
+  const canMarkCompleted = (dateObj: Date | null) => {
+    if (!dateObj) return false;
+    // Créer aujourd'hui à 00:00:00 pour comparer les dates sans l'heure
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Créer une copy de dateObj à 00:00:00
+    const dayToMark = new Date(dateObj);
+    dayToMark.setHours(0, 0, 0, 0);
+    
+    // On peut marquer complété seulement si la date est aujourd'hui ou dans le passé
+    return dayToMark <= today;
+  };
+
   const loadContent = useCallback(async () => {
     try {
       const { data } = await supabase
@@ -91,6 +105,17 @@ const Careme2026 = memo(() => {
 
   const markCompleted = async (dateObj: Date | null) => {
     if (!user || !dateObj) return window.location.assign('/auth');
+    
+    // Vérifier que la date n'est pas dans le futur
+    if (!canMarkCompleted(dateObj)) {
+      toast({ 
+        title: 'Date impossible', 
+        description: 'Vous ne pouvez marquer que les jours passés ou le jour actuel comme complétés',
+        variant: 'destructive' 
+      });
+      return;
+    }
+    
     const dateStr = toIsoDate(dateObj);
     setCompletedDates((s) => Array.from(new Set([...s, dateStr])));
     try {
@@ -393,14 +418,19 @@ const Careme2026 = memo(() => {
                         const dateObj = parseDateFromLabel(day.date);
                         const isCompleted = isCompletedDate(dateObj);
                         const isSun = isSunday(day);
+                        const canMark = canMarkCompleted(dateObj);
+                        const isFuture = dateObj && !canMark && !isCompleted;
                         
                         return (
                           <button
                             key={dayIdx}
-                            onClick={() => !isSun && setSelectedDay({ ...day, dateObj })}
+                            onClick={() => !isSun && !isFuture && setSelectedDay({ ...day, dateObj })}
+                            disabled={isFuture}
                             className={`p-3 rounded-lg text-left transition-all active:scale-95 ${
                               isSun
                                 ? 'bg-gray-50 border border-gray-200 cursor-default dark:bg-slate-800 dark:border-slate-600 dark:text-slate-400'
+                                : isFuture
+                                ? 'bg-gray-100 border border-gray-300 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-500'
                                 : 'bg-white border-2 border-violet-100 hover:border-violet-400 hover:shadow-md cursor-pointer dark:bg-slate-900 dark:border-violet-800 dark:text-slate-100'
                             } ${isCompleted ? 'ring-2 ring-green-400 ring-offset-1' : ''}`}
                           >
@@ -484,6 +514,7 @@ const Careme2026 = memo(() => {
                       : markCompleted(selectedDay.dateObj)
                     }
                     variant={isCompletedDate(selectedDay.dateObj) ? 'default' : 'outline'}
+                    disabled={!isCompletedDate(selectedDay.dateObj) && !canMarkCompleted(selectedDay.dateObj)}
                   >
                     <Check className="w-4 h-4" />
                     <span className="hidden sm:inline">{isCompletedDate(selectedDay.dateObj) ? 'Complété' : 'Compléter'}</span>

@@ -13,7 +13,7 @@ export interface SharePreviewData {
 }
 
 /**
- * Capture le Dialog complet (sans troncature)
+ * Capture le Dialog complet (sans troncature) et ajoute un footer branding
  */
 export const generateShareImage = async (data: SharePreviewData): Promise<Blob | null> => {
   try {
@@ -29,36 +29,116 @@ export const generateShareImage = async (data: SharePreviewData): Promise<Blob |
     
     console.log('✅ Dialog trouvé');
     
-    // Sauvegarder les styles originaux
-    const originalMaxHeight = dialogContent.style.maxHeight;
-    const originalOverflow = dialogContent.style.overflow;
-    const originalHeight = dialogContent.style.height;
+    // Cloner le Dialog pour ne pas modifier l'original
+    const clonedContent = dialogContent.cloneNode(true) as HTMLElement;
+    
+    // Supprimer TOUS les boutons et icônes
+    // 1. Supprimer tous les éléments button
+    const allButtons = clonedContent.querySelectorAll('button');
+    allButtons.forEach(btn => btn.remove());
+    console.log('🗑️ Tous les boutons supprimés');
+    
+    // 2. Supprimer les icônes SVG (X de fermeture, etc)
+    const allSvgs = clonedContent.querySelectorAll('svg');
+    allSvgs.forEach(svg => {
+      // Vérifier que le SVG n'est pas dans le footer branding
+      if (!svg.closest('footer')) {
+        svg.remove();
+      }
+    });
+    console.log('🗑️ Icônes SVG supprimées');
+    
+    // 3. Supprimer les sections avec boutons (divs border-t qui contiennent des buttons remnants)
+    const allDivs = clonedContent.querySelectorAll('div');
+    const buttonsToRemove: Element[] = [];
+    
+    allDivs.forEach(div => {
+      const classList = div.getAttribute('class') || '';
+      // Chercher les divs avec border-t (bordure top) ET qui contiennent des boutons
+      if ((classList.includes('border-t') || classList.includes('pt-4') || classList.includes('pt-6')) && 
+          div.querySelector('button')) {
+        // Vérifier que c'est un parent direct ou proche de boutons
+        const buttons = div.querySelectorAll('button');
+        if (buttons.length > 0) {
+          buttonsToRemove.push(div);
+          console.log('🗑️ Div avec boutons marquée pour suppression');
+        }
+      }
+    });
+    
+    // Supprimer les divs identifiées
+    buttonsToRemove.forEach(div => {
+      if (div.parentElement && clonedContent.contains(div)) {
+        div.remove();
+        console.log('🗑️ Section des boutons supprimée');
+      }
+    });
+    
+    // Ajouter le footer branding (une seule ligne, sans box)
+    const footer = document.createElement('div');
+    footer.style.cssText = `
+      margin-top: -30px;
+      padding: 0;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      flex-wrap: wrap;
+      width: 100%;
+      box-sizing: border-box;
+    `;
+    
+    footer.innerHTML = `
+      <img src="/logo-3v.png" alt="Logo 3V" style="height: 40px;">
+      <span style="color: #581c87; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">VOIE, VÉRITÉ, VIE</span>
+      <span style="color: #666; font-size: 12px;">voie-verite-vie.netlify.app</span>
+    `;
+    
+    clonedContent.appendChild(footer);
+    console.log('✨ Footer branding compact ajouté');
+    
+    // Ajouter temporairement le clone au DOM
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      background: white;
+    `;
+    
+    wrapper.appendChild(clonedContent);
+    document.body.appendChild(wrapper);
+    
+    // Sauvegarder les styles originaux du Dialog
+    const originalMaxHeight = clonedContent.style.maxHeight;
+    const originalOverflow = clonedContent.style.overflow;
+    const originalHeight = clonedContent.style.height;
     
     // Retirer les contraintes pour capturer tout
-    dialogContent.style.maxHeight = 'none';
-    dialogContent.style.overflow = 'visible';
-    dialogContent.style.height = 'auto';
+    clonedContent.style.maxHeight = 'none';
+    clonedContent.style.overflow = 'visible';
+    clonedContent.style.height = 'auto';
     
     console.log('🔧 Styles modifiés pour capture complète');
     
-    // Attendre que le DOM se mette à jour
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Attendre que le DOM se mette à jour et que les calculs CSS se terminent
+    await new Promise(resolve => setTimeout(resolve, 150));
     
-    // Capturer
-    const canvas = await html2canvas(dialogContent, {
+    // Capturer avec meilleure qualité
+    const canvas = await html2canvas(clonedContent, {
       backgroundColor: '#ffffff',
-      scale: 2,
+      scale: 3,
       useCORS: true,
       allowTaint: true,
       logging: false,
       imageTimeout: 0,
-      windowHeight: dialogContent.scrollHeight,
+      windowHeight: clonedContent.scrollHeight,
     });
     
-    // Restaurer les styles originaux
-    dialogContent.style.maxHeight = originalMaxHeight;
-    dialogContent.style.overflow = originalOverflow;
-    dialogContent.style.height = originalHeight;
+    // Nettoyer le wrapper temporaire
+    document.body.removeChild(wrapper);
     
     console.log('✅ Image capturée:', canvas.width, 'x', canvas.height);
     
@@ -68,7 +148,7 @@ export const generateShareImage = async (data: SharePreviewData): Promise<Blob |
           console.log('💾 Image:', blob.size, 'bytes');
         }
         resolve(blob);
-      }, 'image/png', 0.95);
+      }, 'image/png', 1.0);
     });
     
   } catch (error) {
