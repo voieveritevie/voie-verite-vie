@@ -17,29 +17,32 @@ export const useAuth = () => {
         if (email === 'ahdybau@gmail.com') {
           console.log('Superadmin detected - ensuring admin role is set...');
           
-          // Vérifier d'abord s'il a le rôle
+          // Vérifier d'abord s'il a un rôle admin
           const { data: existingRoles, error: checkError } = await supabase
             .from('user_roles')
             .select('role')
-            .eq('user_id', userId)
-            .eq('role', 'admin');
+            .eq('user_id', userId);
           
-          if (!checkError && (!existingRoles || existingRoles.length === 0)) {
-            // Si pas de rôle admin, l'ajouter
-            console.log('Adding admin role to superadmin...');
+          const hasAdminRole = existingRoles?.some((r: any) => 
+            ['admin_principal', 'admin', 'moderator'].includes(r.role)
+          );
+          
+          if (!checkError && !hasAdminRole) {
+            // Si pas de rôle admin, ajouter admin_principal
+            console.log('Adding admin_principal role to superadmin...');
             const { error: insertError } = await supabase
               .from('user_roles')
               .insert([
                 {
                   user_id: userId,
-                  role: 'admin'
+                  role: 'admin_principal'
                 }
               ]);
             
             if (insertError) {
               console.error('Error adding admin role:', insertError);
             } else {
-              console.log('Admin role successfully added');
+              console.log('Admin_principal role successfully added');
             }
           }
         }
@@ -55,8 +58,10 @@ export const useAuth = () => {
           return;
         }
         
-        // Vérifier si l'utilisateur a le rôle 'admin' dans le tableau des rôles
-        const hasAdminRole = data && data.some((role: any) => role.role === 'admin');
+        // Vérifier si l'utilisateur a un rôle admin (admin_principal, admin, ou moderator)
+        const hasAdminRole = data && data.some((role: any) => 
+          ['admin_principal', 'admin', 'moderator'].includes(role.role)
+        );
         console.log('Admin role check result:', { data, hasAdminRole });
         setIsAdmin(hasAdminRole);
       } catch (error) {
