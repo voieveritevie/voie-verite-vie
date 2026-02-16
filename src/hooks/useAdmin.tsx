@@ -16,17 +16,31 @@ export const useAdmin = () => {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
-        .in('role', ['admin_principal', 'admin', 'moderator'])
-        .maybeSingle();
+        .eq('user_id', userId);
       
       if (error) {
         console.error('Error checking admin role:', error);
         setIsAdmin(false);
         setAdminRole(null);
-      } else if (data) {
-        setIsAdmin(true);
-        setAdminRole(data.role as AdminRole);
+      } else if (data && data.length > 0) {
+        // Chercher le rôle admin le plus haut dans la hiérarchie
+        let userRole: AdminRole = null;
+        
+        if (data.some((r: any) => r.role === 'admin_principal')) {
+          userRole = 'admin_principal';
+        } else if (data.some((r: any) => r.role === 'admin')) {
+          userRole = 'admin';
+        } else if (data.some((r: any) => r.role === 'moderator')) {
+          userRole = 'moderator';
+        }
+        
+        if (userRole) {
+          setIsAdmin(true);
+          setAdminRole(userRole);
+        } else {
+          setIsAdmin(false);
+          setAdminRole(null);
+        }
       } else {
         setIsAdmin(false);
         setAdminRole(null);
