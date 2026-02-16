@@ -62,18 +62,22 @@ const AdminUsers = () => {
       return;
     }
 
-    const { data: userRole } = await supabase
+    const { data: userRoles } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle();
+      .eq('user_id', user.id);
 
-    if (!userRole || !['admin_principal', 'admin'].includes(userRole.role)) {
+    // Chercher un rôle admin parmi tous les rôles
+    const adminRole = userRoles?.find((r: any) => 
+      ['admin_principal', 'admin', 'moderator'].includes(r.role)
+    );
+
+    if (!adminRole) {
       navigate('/');
       return;
     }
 
-    setIsMainAdmin(userRole.role === 'admin_principal');
+    setIsMainAdmin(adminRole.role === 'admin_principal');
     loadData();
   };
 
