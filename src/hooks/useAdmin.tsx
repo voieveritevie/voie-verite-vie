@@ -11,8 +11,42 @@ export const useAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [checked, setChecked] = useState(false);
 
-  const checkAdmin = useCallback(async (userId: string) => {
+  const checkAdmin = useCallback(async (userId: string, email?: string) => {
     try {
+      // Si c'est le superadmin et qu'il n'a pas le rôle admin_principal, le corriger
+      if (email === 'ahdybau@gmail.com') {
+        console.log('Superadmin detected - ensuring admin_principal role is set...');
+        
+        // Vérifier d'abord s'il a le rôle admin_principal
+        const { data: existingRoles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId);
+        
+        const hasAdminPrincipalRole = existingRoles?.some((r: any) => r.role === 'admin_principal');
+        
+        if (!hasAdminPrincipalRole) {
+          // Supprimer les anciens rôles admin
+          console.log('Removing old admin roles from superadmin...');
+          await supabase
+            .from('user_roles')
+            .delete()
+            .eq('user_id', userId)
+            .in('role', ['admin', 'moderator', 'admin_principal']);
+          
+          // Ajouter admin_principal
+          console.log('Adding admin_principal role to superadmin...');
+          await supabase
+            .from('user_roles')
+            .insert([
+              {
+                user_id: userId,
+                role: 'admin_principal'
+              }
+            ]);
+        }
+      }
+      
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
@@ -66,7 +100,7 @@ export const useAdmin = () => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        await checkAdmin(session.user.id);
+        await checkAdmin(session.user.id, session.user.email);
       } else {
         setLoading(false);
         setChecked(true);
@@ -83,7 +117,7 @@ export const useAdmin = () => {
         
         if (session?.user) {
           setLoading(true);
-          await checkAdmin(session.user.id);
+          await checkAdmin(session.user.id, session.user.email);
         } else {
           setIsAdmin(false);
           setAdminRole(null);

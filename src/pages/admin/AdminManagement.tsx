@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
 import { supabase } from '@/integrations/supabase/client';
 import Navigation from '@/components/Navigation';
 import AdminLoadingSpinner from '@/components/admin/AdminLoadingSpinner';
@@ -36,7 +36,7 @@ interface AdminUser {
 
 const AdminManagement = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading, isAdmin } = useAuth();
+  const { user, isAdmin, adminRole, loading: authLoading } = useAdmin();
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -44,31 +44,13 @@ const AdminManagement = () => {
 
   useEffect(() => {
     if (!authLoading) {
-      checkAccess();
+      if (!user || !isAdmin || adminRole !== 'admin_principal') {
+        navigate(adminRole ? '/admin' : '/');
+        return;
+      }
+      loadAdmins();
     }
-  }, [user, authLoading, isAdmin]);
-
-  const checkAccess = async () => {
-    if (!user || !isAdmin) {
-      navigate('/');
-      return;
-    }
-
-    // Vérifier si l'utilisateur est l'admin principal
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
-
-    const isMainAdmin = userRole?.some((r: any) => r.role === 'admin_principal');
-
-    if (!isMainAdmin) {
-      navigate('/admin');
-      return;
-    }
-
-    loadAdmins();
-  };
+  }, [user, isAdmin, adminRole, authLoading, navigate]);
 
   const loadAdmins = async () => {
     try {
@@ -76,7 +58,7 @@ const AdminManagement = () => {
       const { data: adminRoles } = await supabase
         .from('user_roles')
         .select('user_id, role')
-        .in('role', ['admin_principal', 'admin', 'moderator']);
+        .in('role', ['admin_principal', 'admin', 'moderator'] as any);
 
       if (!adminRoles) return;
 
@@ -108,7 +90,7 @@ const AdminManagement = () => {
       await supabase.from('user_roles').delete().eq('user_id', userId);
       
       // Ajouter le nouveau rôle
-      await supabase.from('user_roles').insert({ user_id: userId, role: newRole });
+      await supabase.from('user_roles').insert({ user_id: userId, role: newRole as any });
 
       toast.success('Rôle mis à jour');
       loadAdmins();
@@ -143,7 +125,7 @@ const AdminManagement = () => {
   };
 
   if (loading || authLoading) return <AdminLoadingSpinner />;
-  if (!user || !isAdmin) return null;
+  if (!user || !isAdmin || adminRole !== 'admin_principal') return null;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -200,10 +182,10 @@ const AdminManagement = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="flex gap-2">
-                        {!isCurrentUser && admin.role !== 'admin_principal' && (
+                        {!isCurrentUser && (admin.role as any) !== 'admin_principal' && (
                           <>
                             <Select 
-                              value={admin.role === 'admin_principal' ? 'admin' : admin.role}
+                              value={(admin.role as any) === 'admin_principal' ? 'admin' : admin.role}
                               onValueChange={(newRole: any) => updateAdminRole(admin.id, newRole)}
                             >
                               <SelectTrigger className="w-[150px]">

@@ -78,52 +78,14 @@ const Profile = () => {
       }
 
       // Charger les prières sauvegardées
-      const { data: prayersData } = await supabase
-        .from('prayer_favorites')
-        .select(`
-          id, 
-          created_at,
-          prayer_requests!prayer_ID (
-            id,
-            title
-          )
-        `)
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (prayersData) {
-        const formattedPrayers = prayersData
-          .filter((p: any) => p.prayer_requests)
-          .map((p: any) => ({
-            id: p.id,
-            prayer_request_id: p.prayer_requests.id,
-            prayer_title: p.prayer_requests.title || 'Prière sans titre',
-            created_at: p.created_at,
-          }));
-        setPrayers(formattedPrayers);
-        setStats(s => ({ ...s, favoritesCount: formattedPrayers.length }));
-      }
+      // Note: prayer_favorites table doesn't exist yet
+      setPrayers([]);
+      setStats(s => ({ ...s, favoritesCount: 0 }));
 
       // Charger la progression de lecture
-      const { data: readingsData } = await supabase
-        .from('daily_readings')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('date_read', { ascending: false })
-        .limit(10);
-
-      if (readingsData) {
-        const formattedReadings = readingsData.map((r: any) => ({
-          id: r.id,
-          book_name: r.book || 'Livre',
-          chapter: r.chapter || 1,
-          date_read: r.date_read,
-        }));
-        setReadings(formattedReadings);
-        const uniqueDays = new Set(formattedReadings.map(r => r.date_read));
-        setStats(s => ({ ...s, readingDays: uniqueDays.size }));
-      }
+      // Note: daily_readings table doesn't exist yet
+      setReadings([]);
+      setStats(s => ({ ...s, readingDays: 0 }));
 
       // Autres statistiques
       const { count: prayersCount } = await supabase

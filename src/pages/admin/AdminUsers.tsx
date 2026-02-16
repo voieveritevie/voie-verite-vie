@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
 import { supabase } from '@/integrations/supabase/client';
 import Navigation from '@/components/Navigation';
 import AdminLoadingSpinner from '@/components/admin/AdminLoadingSpinner';
@@ -42,44 +42,22 @@ interface UserRole {
 
 const AdminUsers = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, isAdmin, adminRole, loading: authLoading } = useAdmin();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isMainAdmin, setIsMainAdmin] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading) {
-      checkAdminStatus();
+      if (!user || !isAdmin) {
+        navigate('/');
+      } else {
+        loadData();
+      }
     }
-  }, [user, authLoading]);
-
-  const checkAdminStatus = async () => {
-    if (!user) {
-      navigate('/');
-      return;
-    }
-
-    const { data: userRoles } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
-
-    // Chercher un rôle admin parmi tous les rôles
-    const adminRole = userRoles?.find((r: any) => 
-      ['admin_principal', 'admin', 'moderator'].includes(r.role)
-    );
-
-    if (!adminRole) {
-      navigate('/');
-      return;
-    }
-
-    setIsMainAdmin(adminRole.role === 'admin_principal');
-    loadData();
-  };
+  }, [user, isAdmin, authLoading, navigate]);
 
   const loadData = async () => {
     try {
@@ -145,8 +123,10 @@ const AdminUsers = () => {
   };
 
   if (loading || authLoading) return <AdminLoadingSpinner />;
-  // Seul l'admin principal peut accéder à cette page
-  if (!user || !isMainAdmin) return null;
+  // Tous les admins peuvent accéder à cette page
+  if (!user || !isAdmin) return null;
+  
+  const isMainAdmin = adminRole === 'admin_principal';
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -160,10 +140,14 @@ const AdminUsers = () => {
           <h1 className="text-3xl font-bold flex items-center gap-2 mb-2">
             <Users className="h-8 w-8" /> Gestion des Utilisateurs
           </h1>
+          <p className="text-sm text-muted-foreground flex items-center gap-1">
+            <Shield className="h-4 w-4" /> 
+            {isMainAdmin ? 'Vous êtes Admin Principal' : `Vous êtes ${adminRole === 'moderator' ? 'Modérateur' : 'Admin'}`}
+          </p>
           {isMainAdmin && (
-            <p className="text-sm text-muted-foreground flex items-center gap-1">
-              <Shield className="h-4 w-4" /> Vous êtes Admin Principal
-            </p>
+            <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded ml-2">
+              Permissions complètes
+            </span>
           )}
         </div>
 
@@ -237,6 +221,9 @@ const AdminUsers = () => {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </>
+                        )}
+                        {!isMainAdmin && (
+                          <span className="text-xs text-muted-foreground">Lecture seule</span>
                         )}
                       </TableCell>
                     </TableRow>

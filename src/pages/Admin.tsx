@@ -4,6 +4,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { supabase } from '@/integrations/supabase/client';
 import Navigation from '@/components/Navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import FixSuperadminRole from '@/components/admin/FixSuperadminRole';
 import { 
   Home, Info, Calendar, BookOpen, MessageSquare, 
   Image, HelpCircle, Mail, Bot, Settings, Users, Shield, Flame, Cross
@@ -137,6 +138,13 @@ const Admin = () => {
             </Link>
           ))}
         </div>
+
+        {/* Afficher le fix si pas admin_principal */}
+        {adminRole !== 'admin_principal' && (
+          <div className="mb-8">
+            <FixSuperadminRole />
+          </div>
+        )}
 
         <div className="mt-8 p-6 bg-muted/50 rounded-lg">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">

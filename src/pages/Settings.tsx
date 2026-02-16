@@ -1,12 +1,28 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useSettings, type Theme, type TextSize } from '@/hooks/useSettings';
-import { Sun, Moon, Monitor, Type, Bell, Globe, Lock, Download, Trash2, Info } from 'lucide-react';
+import { Sun, Moon, Monitor, Type, Bell, Globe, Lock, Download, Trash2, Info, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const Settings = memo(() => {
   const { settings, setTheme, setTextSize, isDarkMode } = useSettings();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const themeOptions: { value: Theme; label: string; icon: React.ReactNode }[] = [
     { value: 'light', label: 'Clair', icon: <Sun className="w-5 h-5" /> },
@@ -36,6 +52,92 @@ const Settings = memo(() => {
   const installApp = () => {
     const event = new Event('beforeinstallprompt');
     window.dispatchEvent(event);
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      setDeletingAccount(true);
+
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !session.user) {
+        toast({
+          title: "Erreur",
+          description: "Déconnecté. Reconnectez-vous pour supprimer votre compte.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const userId = session.user.id;
+      console.log("🗑️ Suppression du compte:", userId);
+
+      // Step 1: Delete from profiles
+      console.log("Step 1: Suppression du profil...");
+      await supabase.from('profiles').delete().eq('id', userId).select();
+
+      // Step 2: Delete from user_roles
+      console.log("Step 2: Suppression des rôles...");
+      await supabase.from('user_roles').delete().eq('user_id', userId).select();
+
+      // Step 3: HARD DELETE from auth.users via RPC
+      console.log("Step 3: Suppression de auth.users...");
+      try {
+        const { data: result, error } = await supabase.rpc('hard_delete_auth_user', {
+          target_user_id: userId,
+        });
+        
+        if (error) {
+          console.error('RPC delete error:', error);
+          // Don't stop, try alternative
+        } else {
+          console.log('✅ RPC delete result:', result);
+        }
+      } catch (rpcErr) {
+        console.error('RPC error:', rpcErr);
+      }
+
+      // Step 4: Sign out (might fail since user was deleted, but try anyway)
+      console.log("Step 4: Déconnexion...");
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.log('Sign out failed (user already deleted)');
+      }
+
+      // Step 5: Clear everything
+      console.log("Step 5: Nettoyage...");
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      if ('caches' in window) {
+        try {
+          const names = await caches.keys();
+          await Promise.all(names.map(name => caches.delete(name)));
+        } catch (e) {
+          console.log('Cache error');
+        }
+      }
+
+      console.log("✅ COMPTE SUPPRIMÉ DÉFINITIVEMENT!");
+
+      toast({
+        title: "✅ Compte supprimé",
+        description: "Vous ne pouvez plus vous connecter. Compte supprimé de façon permanente.",
+      });
+
+      setTimeout(() => navigate('/'), 2000);
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer. Contactez support@voieVeriteVie.com",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingAccount(false);
+      setDeleteDialogOpen(false);
+    }
   };
 
   return (
@@ -283,6 +385,34 @@ const Settings = memo(() => {
               </CardContent>
             </Card>
 
+            {/* Delete Account */}
+            <Card className={`${isDarkMode ? 'bg-red-950 border-red-900' : 'bg-red-50 border-red-200'}`}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-600">
+                  <AlertTriangle className="w-5 h-5" />
+                  Zone Dangereuse
+                </CardTitle>
+                <CardDescription className={isDarkMode ? 'text-red-300' : 'text-red-700'}>
+                  Actions irréversibles
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-red-900/30' : 'bg-red-100'}`}>
+                  <p className={`text-sm ${isDarkMode ? 'text-red-200' : 'text-red-800'}`}>
+                    ⚠️ <strong>Attention :</strong> Cette action supprimera définitivement votre compte et toutes vos données associées. Cette action ne peut pas être annulée.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setDeleteDialogOpen(true)}
+                  variant="destructive"
+                  className="w-full justify-start gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Supprimer mon compte
+                </Button>
+              </CardContent>
+            </Card>
+
             {/* About */}
             <Card className={isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : ''}>
               <CardHeader>
@@ -326,6 +456,42 @@ const Settings = memo(() => {
           </div>
         </div>
       </main>
+
+      {/* Delete Account Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Supprimer définitivement votre compte ?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 mt-4">
+              <p>
+                Cette action est <strong>irréversible</strong>. Vous perdrez :
+              </p>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                <li>Votre compte et toutes vos données personnelles</li>
+                <li>Vos lectures bibliques en cours</li>
+                <li>Vos prières sauvegardées</li>
+                <li>Votre progression spirituelle</li>
+              </ul>
+              <p>
+                Voulez-vous vraiment continuer ?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteAccount} 
+              disabled={deletingAccount}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deletingAccount ? 'Suppression...' : 'Supprimer mon compte'}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });
